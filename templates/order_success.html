@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% set title = "Success" %}
+{% block content %}
+<div class="card shadow">
+  <div class="card-body">
+    <h2 class="text-success">✅ Order Confirmed</h2>
+    <p>Your order number: <strong>{{ order.order_number }}</strong></p>
+    <ul>
+      <li>Name: {{ order.student_name }}</li>
+      <li>Class: {{ order.class_section }}</li>
+      <li>Item: {{ order.item_name }}</li>
+      <li>Price: ₹{{ order.price }}</li>
+    </ul>
+    <a href="{{ url_for('student_form') }}" class="btn btn-primary">New Order</a>
+  </div>
+</div>
+{% endblock %}
