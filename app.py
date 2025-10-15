@@ -4,6 +4,7 @@ from typing import Optional
 from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 
+# --- Basic setup ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "orders.db")
 
@@ -11,7 +12,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["STAFF_KEY"] = os.environ.get("STAFF_KEY", "canteen123")
+app.config["STAFF_KEY"] = os.environ.get("STAFF_KEY", "canteen123")  # Default if not set
 
 db = SQLAlchemy(app)
 
@@ -31,6 +32,7 @@ MENU_ITEMS = [
     ("Water Bottle", 20),
 ]
 
+# ---- Database Model ----
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_name = db.Column(db.String(120), nullable=False)
@@ -51,15 +53,19 @@ class Order(db.Model):
             "created_at": self.created_at.isoformat(),
         }
 
+# ---- Helpers ----
 def ensure_db():
+    """Ensure the database and tables exist."""
     with app.app_context():
         db.create_all()
 
 def generate_order_number(created: datetime, row_id_hint: Optional[int] = None) -> str:
+    """Generate a unique readable order number."""
     date_part = created.strftime("%Y%m%d")
     seq = f"{row_id_hint:04d}" if row_id_hint else f"{int(created.timestamp()) % 10000:04d}"
     return f"{date_part}-{seq}"
 
+# ---- Routes ----
 @app.route("/")
 def student_form():
     return render_template("student.html", menu=MENU_ITEMS)
@@ -71,16 +77,16 @@ def place_order():
     item = request.form.get("item")
 
     if not name or not class_section or not item:
-        return render_template("student.html", menu=MENU_ITEMS, error="Fill all fields")
+        return render_template("student.html", menu=MENU_ITEMS, error="Please fill all fields.")
 
     try:
         idx = int(item)
         item_name, price = MENU_ITEMS[idx]
     except Exception:
-        return render_template("student.html", menu=MENU_ITEMS, error="Invalid item selected")
+        return render_template("student.html", menu=MENU_ITEMS, error="Invalid item selected.")
 
     created = datetime.utcnow()
-    temp = Order(
+    order = Order(
         student_name=name,
         class_section=class_section,
         item_name=item_name,
@@ -88,12 +94,12 @@ def place_order():
         created_at=created,
         order_number="temp"
     )
-    db.session.add(temp)
+    db.session.add(order)
     db.session.flush()
-    temp.order_number = generate_order_number(created, temp.id)
+    order.order_number = generate_order_number(created, order.id)
     db.session.commit()
 
-    return redirect(url_for("order_success", order_number=temp.order_number))
+    return redirect(url_for("order_success", order_number=order.order_number))
 
 @app.route("/success/<order_number>")
 def order_success(order_number):
@@ -112,7 +118,9 @@ def api_orders():
     orders = [o.to_dict() for o in Order.query.order_by(Order.id.desc()).all()]
     return jsonify({"orders": orders})
 
+# ---- Main entry point ----
 if __name__ == "__main__":
     ensure_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
+
 
